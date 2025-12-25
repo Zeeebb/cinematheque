@@ -1,5 +1,33 @@
 const TMDB_KEY = '2dca580c2a14b55200e784d157207b4d';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w300';
+const OMDB_KEY = '2a89ad59';
+
+// Fetch poster from TMDB then fallback to OMDb
+const fetchPoster = async (title, year) => {
+  // Try TMDB first
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}&year=${year}`
+    );
+    const data = await res.json();
+    if (data.results?.[0]?.poster_path) {
+      return TMDB_IMG + data.results[0].poster_path;
+    }
+  } catch(e) {}
+  
+  // Fallback to OMDb
+  try {
+    const res = await fetch(
+      `https://www.omdbapi.com/?apikey=${OMDB_KEY}&t=${encodeURIComponent(title)}&y=${year}`
+    );
+    const data = await res.json();
+    if (data.Poster && data.Poster !== 'N/A') {
+      return data.Poster;
+    }
+  } catch(e) {}
+  
+  return null;
+};
 
 const App = () => {
   const [films, setFilms] = React.useState(() => {
@@ -13,7 +41,9 @@ const App = () => {
   const [view, setView] = React.useState('grid');
   const [cardSize, setCardSize] = React.useState(120);
   const [showAdd, setShowAdd] = React.useState(false);
+  const [showFix, setShowFix] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [loadingProgress, setLoadingProgress] = React.useState('');
 
   // Save to localStorage
   React.useEffect(() => {
@@ -28,22 +58,20 @@ const App = () => {
       
       setLoading(true);
       const updated = [...films];
+      let count = 0;
       
       for (const film of needPoster) {
-        try {
-          const res = await fetch(
-            `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(film.title)}&year=${film.year}`
-          );
-          const data = await res.json();
-          if (data.results?.[0]?.poster_path) {
-            const idx = updated.findIndex(f => f.id === film.id);
-            if (idx !== -1) {
-              updated[idx] = {...updated[idx], poster: TMDB_IMG + data.results[0].poster_path};
-            }
+        count++;
+        setLoadingProgress(`${count}/${needPoster.length}`);
+        
+        const poster = await fetchPoster(film.title, film.year);
+        if (poster) {
+          const idx = updated.findIndex(f => f.id === film.id);
+          if (idx !== -1) {
+            updated[idx] = {...updated[idx], poster};
           }
-          // Small delay to avoid rate limiting
-          await new Promise(r => setTimeout(r, 100));
-        } catch(e) {}
+        }
+        await new Promise(r => setTimeout(r, 150));
       }
       setFilms(updated);
       setLoading(false);
@@ -79,6 +107,12 @@ const App = () => {
     setSelected(null);
   };
 
+  const updatePoster = (id, poster) => {
+    setFilms(films.map(f => f.id === id ? {...f, poster} : f));
+    if (selected?.id === id) setSelected({...selected, poster});
+    setShowFix(false);
+  };
+
   return (
     <div>
       <header className="header">
@@ -111,7 +145,7 @@ const App = () => {
             )}
           </div>
         </div>
-        {loading && <div className="loading-bar">Chargement des affiches...</div>}
+        {loading && <div className="loading-bar">Chargement des affiches... {loadingProgress}</div>}
       </header>
 
       <main className="main">
@@ -205,6 +239,9 @@ const App = () => {
                 >
                   {selected.watched ? '✓ Vu' : 'Marquer vu'}
                 </button>
+                <button className="btn btn-secondary" onClick={() => setShowFix(true)}>
+                  🖼️ Corriger
+                </button>
                 <button className="btn btn-danger" onClick={() => { if(confirm('Supprimer ce film ?')) deleteFilm(selected.id); }}>
                   🗑️
                 </button>
@@ -219,6 +256,113 @@ const App = () => {
       )}
 
       {showAdd && <AddFilmModal onClose={() => setShowAdd(false)} onAdd={addFilm} />}
+      {showFix && selected && <FixPosterModal film={selected} onClose={() => setShowFix(false)} onSelect={updatePoster} />}
+    </div>
+  );
+};
+
+// Fix Poster Modal - search and select correct poster
+const FixPosterModal = ({ film, onClose, onSelect }) => {
+  const [query, setQuery] = React.useState(film.title);
+  const [results, setResults] = React.useState([]);
+  const [searching, setSearching] = React.useState(false);
+  const [source, setSource] = React.useState('tmdb');
+
+  const doSearch = async () => {
+    if (!query) return;
+    setSearching(true);
+    setResults([]);
+    
+    if (source === 'tmdb') {
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}&language=fr-FR`
+        );
+        const data = await res.json();
+        setResults(data.results?.slice(0, 10).map(m => ({
+          id: m.id,
+          title: m.title,
+          year: m.release_date?.split('-')[0],
+          poster: m.poster_path ? TMDB_IMG + m.poster_path : null,
+          source: 'TMDB'
+        })) || []);
+      } catch(e) {}
+    } else {
+      try {
+        const res = await fetch(
+          `https://www.omdbapi.com/?apikey=${OMDB_KEY}&s=${encodeURIComponent(query)}`
+        );
+        const data = await res.json();
+        if (data.Search) {
+          setResults(data.Search.slice(0, 10).map(m => ({
+            id: m.imdbID,
+            title: m.Title,
+            year: m.Year,
+            poster: m.Poster !== 'N/A' ? m.Poster : null,
+            source: 'OMDb'
+          })));
+        }
+      } catch(e) {}
+    }
+    setSearching(false);
+  };
+
+  React.useEffect(() => {
+    doSearch();
+  }, [source]);
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal fix-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-title">Corriger l'affiche</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="fix-search">
+            <input
+              type="text"
+              className="search-box full"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && doSearch()}
+              placeholder="Titre du film (anglais, original...)"
+            />
+            <button className="btn btn-primary" onClick={doSearch}>🔍</button>
+          </div>
+          
+          <div className="source-toggle">
+            <button className={`source-btn ${source === 'tmdb' ? 'active' : ''}`} onClick={() => setSource('tmdb')}>TMDB</button>
+            <button className={`source-btn ${source === 'omdb' ? 'active' : ''}`} onClick={() => setSource('omdb')}>OMDb/IMDb</button>
+          </div>
+          
+          {searching && <div className="searching">Recherche...</div>}
+          
+          <div className="fix-results">
+            {results.map(r => (
+              <div 
+                key={r.id} 
+                className={`fix-result ${!r.poster ? 'no-poster' : ''}`}
+                onClick={() => r.poster && onSelect(film.id, r.poster)}
+              >
+                {r.poster ? (
+                  <img src={r.poster} alt="" />
+                ) : (
+                  <div className="fix-no-poster">Pas d'affiche</div>
+                )}
+                <div className="fix-result-info">
+                  <div className="fix-result-title">{r.title}</div>
+                  <div className="fix-result-year">{r.year} · {r.source}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {results.length === 0 && !searching && (
+            <div className="empty-small">Aucun résultat. Essayez le titre en anglais ou original.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -229,10 +373,9 @@ const AddFilmModal = ({ onClose, onAdd }) => {
   const [results, setResults] = React.useState([]);
   const [searching, setSearching] = React.useState(false);
   const [form, setForm] = React.useState({ title: '', director: '', year: '', genre: '', source: '', watched: false, poster: '' });
-  const [mode, setMode] = React.useState('search'); // 'search' or 'manual'
+  const [mode, setMode] = React.useState('search');
   const timeoutRef = React.useRef(null);
 
-  // Search TMDB
   React.useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (!query || query.length < 2) { setResults([]); return; }

@@ -1,6 +1,7 @@
 const TMDB_KEY = '2dca580c2a14b55200e784d157207b4d';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w300';
 const OMDB_KEY = '2a89ad59';
+const SHEETS_API = 'https://script.google.com/macros/s/AKfycbwKSMuZksZwy6JLmBo9lq0kF9rwDkTP63_BY_a7czQHYiwuEJTWNUMJJiYZJCksNmjnUw/exec';
 
 // Fetch poster from TMDB then fallback to OMDb
 const fetchPoster = async (title, year, type = 'movie') => {
@@ -32,14 +33,8 @@ const fetchPoster = async (title, year, type = 'movie') => {
 
 const App = () => {
   const [tab, setTab] = React.useState('films');
-  const [films, setFilms] = React.useState(() => {
-    const saved = localStorage.getItem('cine_films');
-    return saved ? JSON.parse(saved) : FILMS;
-  });
-  const [series, setSeries] = React.useState(() => {
-    const saved = localStorage.getItem('cine_series');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [films, setFilms] = React.useState([]);
+  const [series, setSeries] = React.useState([]);
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
   const [genre, setGenre] = React.useState('');
@@ -48,54 +43,81 @@ const App = () => {
   const [cardSize, setCardSize] = React.useState(120);
   const [showAdd, setShowAdd] = React.useState(false);
   const [showFix, setShowFix] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
-  const [loadingProgress, setLoadingProgress] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [syncing, setSyncing] = React.useState(false);
+  const [lastSync, setLastSync] = React.useState(null);
 
   const items = tab === 'films' ? films : series;
   const setItems = tab === 'films' ? setFilms : setSeries;
 
-  // Save to localStorage
+  // Load from Google Sheets on mount
   React.useEffect(() => {
-    localStorage.setItem('cine_films', JSON.stringify(films));
-  }, [films]);
-
-  React.useEffect(() => {
-    localStorage.setItem('cine_series', JSON.stringify(series));
-  }, [series]);
-
-  // Fetch ALL posters on mount (films only)
-  React.useEffect(() => {
-    const fetchAllPosters = async () => {
-      const needPoster = films.filter(f => !f.poster);
-      if (needPoster.length === 0) return;
-      
-      setLoading(true);
-      const updated = [...films];
-      let count = 0;
-      
-      for (const film of needPoster) {
-        count++;
-        setLoadingProgress(`${count}/${needPoster.length}`);
-        
-        const poster = await fetchPoster(film.title, film.year, 'movie');
-        if (poster) {
-          const idx = updated.findIndex(f => f.id === film.id);
-          if (idx !== -1) {
-            updated[idx] = {...updated[idx], poster};
-          }
-        }
-        await new Promise(r => setTimeout(r, 150));
-      }
-      setFilms(updated);
-      setLoading(false);
-    };
-    fetchAllPosters();
+    loadFromSheets();
   }, []);
+
+  const loadFromSheets = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(SHEETS_API);
+      const data = await res.json();
+      
+      const loadedFilms = data.filter(item => item.type !== 'series').map(item => ({
+        ...item,
+        year: parseInt(item.year) || 0,
+        watched: item.watched === 'true' || item.watched === true
+      }));
+      
+      const loadedSeries = data.filter(item => item.type === 'series').map(item => ({
+        ...item,
+        year: parseInt(item.year) || 0,
+        seasons: parseInt(item.seasons) || 0,
+        watched: item.watched === 'true' || item.watched === true
+      }));
+      
+      setFilms(loadedFilms);
+      setSeries(loadedSeries);
+      setLastSync(new Date());
+    } catch(e) {
+      console.error('Erreur chargement:', e);
+      // Fallback to localStorage
+      const savedFilms = localStorage.getItem('cine_films');
+      const savedSeries = localStorage.getItem('cine_series');
+      if (savedFilms) setFilms(JSON.parse(savedFilms));
+      if (savedSeries) setSeries(JSON.parse(savedSeries));
+    }
+    setLoading(false);
+  };
+
+  const saveToSheets = async (newFilms, newSeries) => {
+    setSyncing(true);
+    try {
+      const allData = [
+        ...newFilms.map(f => ({...f, type: 'film'})),
+        ...newSeries.map(s => ({...s, type: 'series'}))
+      ];
+      
+      await fetch(SHEETS_API, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(allData)
+      });
+      
+      setLastSync(new Date());
+      
+      // Also save to localStorage as backup
+      localStorage.setItem('cine_films', JSON.stringify(newFilms));
+      localStorage.setItem('cine_series', JSON.stringify(newSeries));
+    } catch(e) {
+      console.error('Erreur sauvegarde:', e);
+    }
+    setSyncing(false);
+  };
 
   const genres = [...new Set(items.flatMap(f => f.genre ? f.genre.split(',').map(g => g.trim()) : []))].sort();
 
   const filtered = items.filter(f => {
-    if (search && !f.title.toLowerCase().includes(search.toLowerCase()) && 
+    if (search && !f.title?.toLowerCase().includes(search.toLowerCase()) && 
         !f.director?.toLowerCase().includes(search.toLowerCase())) return false;
     if (filter === 'watched' && !f.watched) return false;
     if (filter === 'unwatched' && f.watched) return false;
@@ -110,24 +132,62 @@ const App = () => {
 
   const toggleWatch = (id, e) => {
     if (e) e.stopPropagation();
-    setItems(items.map(f => f.id === id ? {...f, watched: !f.watched} : f));
+    const newItems = items.map(f => f.id === id ? {...f, watched: !f.watched} : f);
+    setItems(newItems);
     if (selected?.id === id) setSelected({...selected, watched: !selected.watched});
+    
+    // Save to sheets
+    if (tab === 'films') {
+      saveToSheets(newItems, series);
+    } else {
+      saveToSheets(films, newItems);
+    }
   };
 
   const addItem = (item) => {
-    setItems([item, ...items]);
+    const newItems = [item, ...items];
+    setItems(newItems);
+    
+    if (tab === 'films') {
+      saveToSheets(newItems, series);
+    } else {
+      saveToSheets(films, newItems);
+    }
   };
 
   const deleteItem = (id) => {
-    setItems(items.filter(f => f.id !== id));
+    const newItems = items.filter(f => f.id !== id);
+    setItems(newItems);
     setSelected(null);
+    
+    if (tab === 'films') {
+      saveToSheets(newItems, series);
+    } else {
+      saveToSheets(films, newItems);
+    }
   };
 
   const updatePoster = (id, poster) => {
-    setItems(items.map(f => f.id === id ? {...f, poster} : f));
+    const newItems = items.map(f => f.id === id ? {...f, poster} : f);
+    setItems(newItems);
     if (selected?.id === id) setSelected({...selected, poster});
     setShowFix(false);
+    
+    if (tab === 'films') {
+      saveToSheets(newItems, series);
+    } else {
+      saveToSheets(films, newItems);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"></div>
+        <div>Chargement de ta cinémathèque...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -135,7 +195,10 @@ const App = () => {
         <div className="header-top">
           <div className="logo">Ciné<span>mathèque</span></div>
           <div className="header-right">
-            <div className="stats"><b>{stats.total}</b> {tab} · <b>{stats.watched}</b> vu{stats.watched > 1 ? 's' : ''}</div>
+            <div className="stats">
+              <b>{stats.total}</b> {tab} · <b>{stats.watched}</b> vu{stats.watched > 1 ? 's' : ''}
+              {syncing && <span className="sync-icon"> ⟳</span>}
+            </div>
             <button className="add-btn" onClick={() => setShowAdd(true)}>+ Ajouter</button>
           </div>
         </div>
@@ -171,7 +234,6 @@ const App = () => {
             )}
           </div>
         </div>
-        {loading && <div className="loading-bar">Chargement des affiches... {loadingProgress}</div>}
       </header>
 
       <main className="main">
@@ -226,7 +288,7 @@ const App = () => {
         ) : (
           <div className="empty">
             {items.length === 0 
-              ? `Aucune ${tab === 'films' ? 'film' : 'série'} ajoutée. Clique sur "+ Ajouter" !`
+              ? `Aucun ${tab === 'films' ? 'film' : 'série'} ajouté. Clique sur "+ Ajouter" !`
               : 'Aucun résultat'
             }
           </div>
@@ -298,12 +360,15 @@ const App = () => {
   );
 };
 
-// Fix Poster Modal - search and select correct poster
+// Fix Poster Modal
 const FixPosterModal = ({ item, type, onClose, onSelect }) => {
   const [query, setQuery] = React.useState(item.title);
+  const [year, setYear] = React.useState(item.year || '');
   const [results, setResults] = React.useState([]);
   const [searching, setSearching] = React.useState(false);
   const [source, setSource] = React.useState('tmdb');
+  const [manualUrl, setManualUrl] = React.useState('');
+  const [showManual, setShowManual] = React.useState(false);
 
   const doSearch = async () => {
     if (!query) return;
@@ -312,9 +377,10 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
     
     if (source === 'tmdb') {
       const endpoint = type === 'films' ? 'search/movie' : 'search/tv';
+      const yearParam = year ? `&year=${year}` : '';
       try {
         const res = await fetch(
-          `https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
+          `https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}${yearParam}`
         );
         const data = await res.json();
         setResults(data.results?.slice(0, 12).map(m => ({
@@ -327,9 +393,10 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
       } catch(e) {}
     } else {
       const omdbType = type === 'films' ? 'movie' : 'series';
+      const yearParam = year ? `&y=${year}` : '';
       try {
         const res = await fetch(
-          `https://www.omdbapi.com/?apikey=${OMDB_KEY}&s=${encodeURIComponent(query)}&type=${omdbType}`
+          `https://www.omdbapi.com/?apikey=${OMDB_KEY}&s=${encodeURIComponent(query)}&type=${omdbType}${yearParam}`
         );
         const data = await res.json();
         if (data.Search) {
@@ -350,6 +417,12 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
     doSearch();
   }, [source]);
 
+  const applyManualUrl = () => {
+    if (manualUrl && manualUrl.startsWith('http')) {
+      onSelect(item.id, manualUrl);
+    }
+  };
+
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal fix-modal" onClick={e => e.stopPropagation()}>
@@ -361,11 +434,19 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
           <div className="fix-search">
             <input
               type="text"
-              className="search-box full"
+              className="search-box"
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && doSearch()}
-              placeholder="Titre (anglais, original...)"
+              placeholder="Titre"
+              style={{flex: 1}}
+            />
+            <input
+              type="number"
+              className="search-box year-input"
+              value={year}
+              onChange={e => setYear(e.target.value)}
+              placeholder="Année"
             />
             <button className="btn btn-primary" onClick={doSearch}>🔍</button>
           </div>
@@ -398,15 +479,34 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
           </div>
           
           {results.length === 0 && !searching && (
-            <div className="empty-small">Aucun résultat. Essayez le titre original ou anglais.</div>
+            <div className="empty-small">Aucun résultat. Essayez le titre original.</div>
           )}
+          
+          <div className="manual-section">
+            <button className="link-btn" onClick={() => setShowManual(!showManual)}>
+              {showManual ? '▼ Masquer' : '▶ Coller une URL'}
+            </button>
+            {showManual && (
+              <div className="manual-url">
+                <input
+                  type="text"
+                  className="search-box"
+                  value={manualUrl}
+                  onChange={e => setManualUrl(e.target.value)}
+                  placeholder="https://..."
+                  style={{flex: 1}}
+                />
+                <button className="btn btn-primary" onClick={applyManualUrl}>OK</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// Add Modal Component (Films or Series)
+// Add Modal
 const AddModal = ({ type, onClose, onAdd }) => {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);

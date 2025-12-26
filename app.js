@@ -50,10 +50,39 @@ const App = () => {
   const items = tab === 'films' ? films : series;
   const setItems = tab === 'films' ? setFilms : setSeries;
 
+  const [posterProgress, setPosterProgress] = React.useState('');
+
   // Load from Google Sheets on mount
   React.useEffect(() => {
     loadFromSheets();
   }, []);
+
+  // Fetch missing posters after loading
+  const fetchMissingPosters = async (filmsList) => {
+    const needPoster = filmsList.filter(f => !f.poster);
+    if (needPoster.length === 0) return filmsList;
+    
+    setPosterProgress(`0/${needPoster.length}`);
+    const updated = [...filmsList];
+    let count = 0;
+    
+    for (const film of needPoster) {
+      count++;
+      setPosterProgress(`${count}/${needPoster.length}`);
+      
+      const poster = await fetchPoster(film.title, film.year, 'movie');
+      if (poster) {
+        const idx = updated.findIndex(f => f.id === film.id);
+        if (idx !== -1) {
+          updated[idx] = {...updated[idx], poster};
+        }
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    
+    setPosterProgress('');
+    return updated;
+  };
 
   const loadFromSheets = async () => {
     setLoading(true);
@@ -61,18 +90,30 @@ const App = () => {
       const res = await fetch(SHEETS_API);
       const data = await res.json();
       
-      const loadedFilms = data.filter(item => item.type !== 'series').map(item => ({
+      let loadedFilms = data.filter(item => item.type !== 'series').map(item => ({
         ...item,
+        id: parseInt(item.id) || item.id,
         year: parseInt(item.year) || 0,
         watched: item.watched === 'true' || item.watched === true
       }));
       
       const loadedSeries = data.filter(item => item.type === 'series').map(item => ({
         ...item,
+        id: parseInt(item.id) || item.id,
         year: parseInt(item.year) || 0,
         seasons: parseInt(item.seasons) || 0,
         watched: item.watched === 'true' || item.watched === true
       }));
+      
+      // Check if we need to fetch posters
+      const missingPosters = loadedFilms.filter(f => !f.poster).length;
+      
+      if (missingPosters > 0) {
+        setLoading(false); // Show UI while fetching posters
+        loadedFilms = await fetchMissingPosters(loadedFilms);
+        // Save updated films with posters to Sheets
+        await saveToSheets(loadedFilms, loadedSeries);
+      }
       
       setFilms(loadedFilms);
       setSeries(loadedSeries);
@@ -202,6 +243,8 @@ const App = () => {
             <button className="add-btn" onClick={() => setShowAdd(true)}>+ Ajouter</button>
           </div>
         </div>
+        
+        {posterProgress && <div className="poster-progress">Téléchargement des affiches... {posterProgress}</div>}
         
         <div className="tabs">
           <button className={`tab ${tab === 'films' ? 'active' : ''}`} onClick={() => { setTab('films'); setGenre(''); }}>

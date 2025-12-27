@@ -1,1224 +1,320 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doodle Chat</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#404040">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg: #e8e8e8;
-            --surface: #f5f5f5;
-            --surface-light: #fff;
-            --border: #ddd;
-            --text: #333;
-            --text-muted: #888;
-            --accent: #0a8f08;
-            --accent-hover: #0b9e09;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: var(--bg);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .app {
-            background: var(--surface);
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            overflow: hidden;
-            width: 100%;
-            max-width: 440px;
-        }
-
-        .header {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #404040;
-        }
-
-        .header-title {
-            color: #fff;
-            font-size: 0.9rem;
-            font-weight: 400;
-        }
-
-        .toolbar {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
-            flex-wrap: wrap;
-            background: #404040;
-        }
-
-        .color-picker-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .current-color {
-            width: 28px;
-            height: 28px;
-            border: 2px solid #666;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .current-color:hover {
-            transform: scale(1.05);
-        }
-
-        .color-history {
-            display: flex;
-            gap: 3px;
-        }
-
-        .history-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 2px;
-            border: 1px solid #555;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .history-color:hover {
-            transform: scale(1.2);
-        }
-
-        .color-palette {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: #e8e8e8;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 12px;
-            display: none;
-            z-index: 100;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        }
-
-        .color-palette.open {
-            display: block;
-        }
-
-        .color-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 28px);
-            gap: 6px;
-        }
-
-        .palette-color {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            transition: transform 0.1s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-
-        .palette-color:hover {
-            transform: scale(1.15);
-            z-index: 1;
-        }
-
-        .divider {
-            width: 1px;
-            height: 28px;
-            background: #555;
-            margin: 0 8px;
-        }
-
-        .tool-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-            border: none;
-            background: transparent;
-            color: #fff;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.15s;
-        }
-
-        .tool-btn:hover {
-            background: #505050;
-        }
-
-        .tool-btn.active {
-            background: #505050;
-        }
-
-        .tool-btn svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        .size-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .size-dot {
-            border-radius: 50%;
-            background: #fff;
-            cursor: pointer;
-            transition: transform 0.1s, opacity 0.1s;
-            opacity: 0.6;
-        }
-
-        .size-dot:hover {
-            transform: scale(1.2);
-        }
-
-        .size-dot.active {
-            opacity: 1;
-        }
-
-        .size-1 { width: 4px; height: 4px; }
-        .size-2 { width: 8px; height: 8px; }
-        .size-3 { width: 14px; height: 14px; }
-        .size-4 { width: 22px; height: 22px; }
-
-        .opacity-group {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .opacity-dots {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .opacity-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #fff;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .opacity-dot:hover {
-            transform: scale(1.2);
-        }
-
-        .opacity-dot.active {
-            outline: 2px solid #fff;
-            outline-offset: 2px;
-        }
-
-        .canvas-area {
-            display: flex;
-            justify-content: center;
-            padding: 12px;
-        }
-
-        canvas {
-            display: block;
-            width: 200px;
-            height: 200px;
-            cursor: crosshair;
-            touch-action: none;
-            border-radius: 2px;
-        }
-
-        .actions {
-            display: flex;
-            gap: 12px;
-            padding: 12px;
-            border-top: 1px solid var(--border);
-        }
-
-        .btn {
-            flex: 1;
-            padding: 12px 16px;
-            border-radius: 4px;
-            border: none;
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--surface-light);
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-hover);
-        }
-
-        .preview-section {
-            padding: 0 12px 12px;
-        }
-
-        .preview-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .preview-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .preview-wrapper img {
-            width: 80px;
-            height: 80px;
-            border-radius: 2px;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--surface);
-            color: var(--text);
-            padding: 12px 24px;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            opacity: 0;
-            transition: all 0.3s ease;
-            pointer-events: none;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .image-input {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cinémathèque</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a;
+      --card: #161616;
+      --card-hover: #1e1e1e;
+      --text: #f0f0f0;
+      --text-dim: #888;
+      --accent: #d4a853;
+      --green: #22c55e;
+      --border: #2a2a2a;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    
+    .loading-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; gap: 1rem; color: var(--text-dim);
+    }
+    .loading-spinner {
+      width: 40px; height: 40px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .sync-icon { color: var(--accent); animation: spin 1s linear infinite; display: inline-block; }
+    
+    .poster-progress {
+      background: var(--accent); color: #000; padding: 0.5rem 1rem; text-align: center;
+      font-size: 0.8rem; font-weight: 500;
+    }
+    
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,0.95); backdrop-filter: blur(10px);
+      padding: 1rem; border-bottom: 1px solid var(--border);
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .logo { font-size: 1.4rem; font-weight: 600; }
+    .logo span { color: var(--accent); }
+    .stats { font-size: 0.75rem; color: var(--text-dim); }
+    .stats b { color: var(--text); }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .add-btn {
+      padding: 0.4rem 0.8rem; background: var(--accent); border: none; border-radius: 6px;
+      color: #000; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    }
+    .add-btn:hover { background: #e8bc5f; }
+    
+    .tabs {
+      display: flex; gap: 0.5rem; margin: 0.75rem 0;
+    }
+    .tab {
+      flex: 1; padding: 0.6rem; background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-dim); font-size: 0.8rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+    }
+    .tab:hover { border-color: var(--text-dim); }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .tab-count {
+      background: rgba(0,0,0,0.2); padding: 0.15rem 0.4rem; border-radius: 10px; font-size: 0.65rem;
+    }
+    .tab.active .tab-count { background: rgba(0,0,0,0.3); }
+    
+    .loading-bar {
+      margin-top: 0.5rem; padding: 0.4rem; background: var(--card); border-radius: 4px;
+      font-size: 0.7rem; color: var(--accent); text-align: center;
+    }
+    
+    .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .search-box {
+      flex: 1; min-width: 150px; padding: 0.5rem 0.75rem;
+      background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.85rem;
+    }
+    .search-box:focus { outline: none; border-color: var(--accent); }
+    
+    .filter-btn {
+      padding: 0.4rem 0.75rem; background: transparent; border: 1px solid var(--border);
+      border-radius: 20px; color: var(--text-dim); font-size: 0.75rem; cursor: pointer;
+    }
+    .filter-btn:hover { border-color: var(--text-dim); }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    
+    select {
+      padding: 0.4rem 0.5rem; background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 0.75rem;
+    }
+    
+    .main { padding: 1rem; }
+    .count { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--card-size, 110px), 1fr));
+      gap: 0.75rem;
+    }
+    
+    .view-controls { display: flex; gap: 0.3rem; align-items: center; margin-left: auto; }
+    .view-btn {
+      padding: 0.35rem 0.5rem; background: var(--card); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text-dim); cursor: pointer; font-size: 0.8rem;
+    }
+    .view-btn:hover { border-color: var(--text-dim); }
+    .view-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .size-slider {
+      width: 60px; height: 4px; background: var(--border); border-radius: 2px;
+      -webkit-appearance: none; cursor: pointer;
+    }
+    .size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      background: var(--accent); border-radius: 50%; cursor: pointer;
+    }
+    
+    .list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .list-item {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem;
+      background: var(--card); border-radius: 6px; cursor: pointer;
+    }
+    .list-item:hover { background: var(--card-hover); }
+    .list-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; }
+    .list-poster-empty {
+      width: 40px; height: 60px; background: #222; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .list-info { flex: 1; min-width: 0; }
+    .list-title { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .list-meta { font-size: 0.7rem; color: var(--text-dim); }
+    
+    .card {
+      position: relative; aspect-ratio: 2/3; background: var(--card);
+      border-radius: 6px; overflow: hidden; cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .card:hover { transform: scale(1.03); }
+    .card-img { width: 100%; height: 100%; object-fit: cover; }
+    .card-info {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 2rem 0.5rem 0.5rem;
+      background: linear-gradient(transparent, rgba(0,0,0,0.9));
+    }
+    .card-title { font-size: 0.7rem; font-weight: 500; line-height: 1.2; }
+    .card-year { font-size: 0.6rem; color: var(--text-dim); }
+    .card-noimg {
+      width: 100%; height: 100%; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; padding: 0.5rem; text-align: center;
+    }
+    
+    .watch-btn {
+      position: absolute; top: 0.3rem; right: 0.3rem; width: 24px; height: 24px;
+      background: rgba(0,0,0,0.6); border: 2px solid #555; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; color: #555;
+    }
+    .watch-btn.watched { background: var(--green); border-color: var(--green); color: #fff; }
+    
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; z-index: 200;
+    }
+    .modal {
+      background: var(--card); border-radius: 10px; max-width: 400px; width: 100%;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal-head {
+      padding: 1rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: start;
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 600; flex: 1; }
+    .modal-close {
+      width: 28px; height: 28px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 50%; color: var(--text); font-size: 1.2rem; cursor: pointer;
+    }
+    .modal-body { padding: 1rem; }
+    .modal-meta { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .modal-section { margin-bottom: 0.75rem; }
+    .modal-section h4 { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.25rem; }
+    .modal-section p { font-size: 0.8rem; }
+    .tag { display: inline-block; padding: 0.2rem 0.4rem; background: var(--bg); border-radius: 4px; font-size: 0.65rem; margin: 0.1rem; }
+    .modal-actions { display: flex; gap: 0.5rem; padding: 1rem; border-top: 1px solid var(--border); }
+    .btn {
+      flex: 1; padding: 0.5rem; border-radius: 6px; font-size: 0.75rem;
+      text-decoration: none; text-align: center; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #000; border: none; }
+    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    
+    .empty { text-align: center; padding: 3rem; color: var(--text-dim); }
+    
+    .modal-poster { float: right; width: 80px; margin: 0 0 0.5rem 0.5rem; border-radius: 4px; }
+    .modal-buttons { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .modal-buttons .btn { flex: 1; }
+    .btn-danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+    .btn-danger:hover { background: rgba(239,68,68,0.1); }
+    
+    /* Add Modal */
+    .add-modal { max-width: 400px; }
+    .search-input-wrap { position: relative; }
+    .search-box.full { width: 100%; margin-bottom: 0.75rem; }
+    .spinner {
+      position: absolute; right: 10px; top: 10px; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .search-results { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .search-result {
+      display: flex; gap: 0.6rem; padding: 0.4rem; background: var(--bg);
+      border-radius: 6px; cursor: pointer;
+    }
+    .search-result:hover { background: #1a1a1a; }
+    .search-result img { width: 36px; height: 54px; object-fit: cover; border-radius: 3px; }
+    .no-poster {
+      width: 36px; height: 54px; background: #222; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .result-title { font-size: 0.85rem; font-weight: 500; }
+    .result-year { font-size: 0.7rem; color: var(--text-dim); }
+    
+    .link-btn {
+      background: none; border: none; color: var(--accent);
+      font-size: 0.8rem; cursor: pointer; padding: 0;
+    }
+    .link-btn:hover { text-decoration: underline; }
+    
+    .form-poster { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .form-poster img { width: 60px; border-radius: 4px; }
+    .form-poster button {
+      padding: 0.3rem 0.5rem; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text-dim); font-size: 0.7rem; cursor: pointer;
+      height: fit-content;
+    }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .form-grid label { display: flex; flex-direction: column; gap: 0.2rem; }
+    .form-grid label.full { grid-column: 1 / -1; }
+    .form-grid label > span { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; }
+    .form-grid input[type="text"],
+    .form-grid input[type="number"] {
+      padding: 0.5rem; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text); font-size: 0.85rem;
+    }
+    .form-grid input:focus { outline: none; border-color: var(--accent); }
+    .form-grid label.checkbox {
+      flex-direction: row; align-items: center; gap: 0.5rem; margin-top: 0.3rem;
+    }
+    .form-grid label.checkbox input { width: 16px; height: 16px; }
+    .form-grid label.checkbox span { font-size: 0.8rem; text-transform: none; }
+    
+    .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    .form-actions .btn { flex: 1; }
+    
+    /* Fix Poster Modal */
+    .fix-modal { max-width: 450px; }
+    .fix-search { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .fix-search .search-box { margin: 0; }
+    .fix-search .btn { padding: 0.5rem 0.75rem; }
+    .year-input { width: 70px !important; flex: none !important; }
+    
+    .source-toggle { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+    .source-btn {
+      flex: 1; padding: 0.4rem; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text-dim); font-size: 0.7rem; cursor: pointer;
+    }
+    .source-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    
+    .searching { text-align: center; padding: 1rem; color: var(--text-dim); font-size: 0.8rem; }
+    
+    .fix-results {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+      max-height: 350px; overflow-y: auto;
+    }
+    .fix-result {
+      display: flex; flex-direction: column; background: var(--bg);
+      border-radius: 6px; overflow: hidden; cursor: pointer;
+    }
+    .fix-result:hover { outline: 2px solid var(--accent); }
+    .fix-result.no-poster { opacity: 0.5; cursor: not-allowed; }
+    .fix-result img { width: 100%; aspect-ratio: 2/3; object-fit: cover; }
+    .fix-no-poster {
+      width: 100%; aspect-ratio: 2/3; background: #1a1a1a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: var(--text-dim);
+    }
+    .fix-result-info { padding: 0.4rem; }
+    .fix-result-title { font-size: 0.7rem; font-weight: 500; line-height: 1.2; }
+    .fix-result-year { font-size: 0.6rem; color: var(--text-dim); }
+    
+    .empty-small { text-align: center; padding: 1rem; color: var(--text-dim); font-size: 0.75rem; }
+    
+    .manual-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+    .manual-url { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .manual-url .search-box { margin: 0; }
+    
+    @media (max-width: 400px) {
+      .grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+      .stats { display: none; }
+    }
+  </style>
 </head>
 <body>
-    <div class="app">
-        <div class="header">
-            <span class="header-title">Doodle Chat</span>
-            <div style="display: flex; gap: 4px;">
-                <button class="tool-btn" id="installBtn" title="Installer l'app" style="display: none;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                </button>
-                <button class="tool-btn" id="detachBtn" title="Détacher dans une popup">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="toolbar">
-            <div class="color-picker-wrapper">
-                <div class="current-color" id="currentColor" style="background: #000000;"></div>
-                <div class="color-history" id="colorHistory"></div>
-                <div class="color-palette" id="colorPalette">
-                    <div class="color-grid" id="colorGrid"></div>
-                </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <button class="tool-btn" id="pencilBtn" title="Crayon (B)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="fillBtn" title="Remplir (F)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 11l-8-8-8.6 8.6a2 2 0 000 2.8l5.2 5.2a2 2 0 002.8 0L19 11z"/>
-                    <path d="M19 15c.6.8 1 1.8 1 3 0 1.7-1.3 3-3 3s-3-1.3-3-3c0-1.2.4-2.2 1-3l2-3 2 3z" fill="currentColor"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="pipetteBtn" title="Pipette (G)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M2 22l1-1h3l9-9"/>
-                    <path d="M3 21v-3l9-9"/>
-                    <path d="M14.5 5.5L19 10l-9 9"/>
-                    <path d="M19 4a2.12 2.12 0 0 1 3 3l-1.5 1.5-3-3L19 4z"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="eraserBtn" title="Gomme (E)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l6 6c.6.6.6 1.5 0 2.1L15 18"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="imageBtn" title="Ajouter image">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="9" cy="9" r="2"/>
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                </svg>
-            </button>
-            <input type="file" id="imageInput" class="image-input" accept="image/*">
-
-            <div class="divider"></div>
-
-            <button class="tool-btn" id="undoBtn" title="Annuler (Ctrl+Z)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 7v6h6"/>
-                    <path d="M3 13c0-4.97 4.03-9 9-9s9 4.03 9 9-4.03 9-9 9a9 9 0 01-6.36-2.64"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="redoBtn" title="Rétablir (Ctrl+Y)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 7v6h-6"/>
-                    <path d="M21 13c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9a9 9 0 006.36-2.64"/>
-                </svg>
-            </button>
-
-            <div class="divider"></div>
-
-            <button class="tool-btn" id="pasteBtn" title="Coller (Ctrl+V)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                </svg>
-            </button>
-
-            <button class="tool-btn" id="clearBtn" title="Effacer tout">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                </svg>
-            </button>
-        </div>
-
-        <div class="toolbar">
-            <div class="size-group">
-                <div class="size-dot size-1" data-size="1"></div>
-                <div class="size-dot size-2 active" data-size="3"></div>
-                <div class="size-dot size-3" data-size="8"></div>
-                <div class="size-dot size-4" data-size="20"></div>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="opacity-dots">
-                <div class="opacity-dot" data-opacity="0.25" style="opacity: 0.25;"></div>
-                <div class="opacity-dot" data-opacity="0.5" style="opacity: 0.5;"></div>
-                <div class="opacity-dot" data-opacity="0.75" style="opacity: 0.75;"></div>
-                <div class="opacity-dot active" data-opacity="1" style="opacity: 1;"></div>
-            </div>
-        </div>
-
-        <div class="canvas-area">
-            <canvas id="canvas" width="400" height="400"></canvas>
-        </div>
-
-        <div class="preview-section">
-            <div class="preview-label">👇 Glisse ou copie l'image</div>
-            <div class="preview-wrapper">
-                <img id="preview" src="" alt="Aperçu" draggable="true">
-            </div>
-        </div>
-
-        <div class="actions">
-            <button class="btn btn-secondary" id="downloadBtn">Télécharger</button>
-            <button class="btn btn-secondary" id="shareBtn" style="display: none;">Partager</button>
-            <button class="btn btn-primary" id="copyBtn">Copier</button>
-        </div>
-    </div>
-
-    <div class="toast" id="toast"></div>
-
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const preview = document.getElementById('preview');
-        const toast = document.getElementById('toast');
-        
-        // Configuration haute résolution
-        const DISPLAY_SIZE = 200; // Taille affichée
-        const EXPORT_SIZE = 200;  // Taille d'export
-        const INTERNAL_SIZE = 400; // Résolution interne (plus de détails)
-        const SCALE = INTERNAL_SIZE / DISPLAY_SIZE;
-        
-        // Configurer le canvas en haute résolution
-        canvas.width = INTERNAL_SIZE;
-        canvas.height = INTERNAL_SIZE;
-        canvas.style.width = DISPLAY_SIZE + 'px';
-        canvas.style.height = DISPLAY_SIZE + 'px';
-        
-        // Style de trait lissé
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.imageSmoothingEnabled = true;
-        
-        // Canvas temporaire pour le trait en cours (opacité propre)
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = INTERNAL_SIZE;
-        tempCanvas.height = INTERNAL_SIZE;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.lineCap = 'round';
-        tempCtx.lineJoin = 'round';
-        
-        // Canvas pour l'export en 200x200
-        const exportCanvas = document.createElement('canvas');
-        exportCanvas.width = EXPORT_SIZE;
-        exportCanvas.height = EXPORT_SIZE;
-        const exportCtx = exportCanvas.getContext('2d');
-
-        let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
-        let points = []; // Points pour le lissage Bézier
-        let currentColor = '#000000';
-        let currentSize = 3;
-        let currentOpacity = 1;
-        let isEraser = false;
-        let isFillMode = false;
-        let isPipetteMode = false;
-        
-        // Historique des couleurs récentes
-        let colorHistory = [];
-        const maxColorHistory = 5;
-        
-        // Snapshot du canvas avant le trait en cours
-        let canvasSnapshot = null;
-
-        // Historique pour undo/redo
-        let history = [];
-        let historyIndex = -1;
-        const maxHistory = 50;
-
-        // Palette de couleurs exacte Hangouts (de l'image)
-        const colors = [
-            // Ligne 1: blanc + gris vers noir
-            '#ffffff', '#c0c0c0', '#a0a0a0', '#808080', '#606060', '#404040', '#202020', '#000000',
-            // Ligne 2: jaune, orange, rouge, vert, cyan, bleu, violet, marron
-            '#e6c83c', '#e8943c', '#d44d3c', '#4caf50', '#40c4dc', '#3c6ee8', '#7040a0', '#402820',
-            // Ligne 3: versions plus claires
-            '#f0f04c', '#f4a848', '#e87060', '#68c868', '#60d4e8', '#6888e8', '#a060b8', '#6c5048',
-            // Ligne 4: versions pastel
-            '#f8f8a0', '#f8d8a8', '#f4a8a0', '#a8d8a8', '#a0e0e8', '#a8b8e0', '#c8a8d0', '#988880'
-        ];
-
-        // Générer la grille de couleurs
-        const colorGrid = document.getElementById('colorGrid');
-        colors.forEach(color => {
-            const div = document.createElement('div');
-            div.className = 'palette-color';
-            div.style.background = color;
-            div.dataset.color = color;
-            div.addEventListener('click', () => {
-                setColor(color);
-                document.getElementById('colorPalette').classList.remove('open');
-            });
-            colorGrid.appendChild(div);
-        });
-        
-        // Fonction pour changer de couleur et mettre à jour l'historique
-        function setColor(color) {
-            currentColor = color;
-            document.getElementById('currentColor').style.background = color;
-            isEraser = false;
-            isPipetteMode = false;
-            document.getElementById('eraserBtn')?.classList.remove('active');
-            document.getElementById('pipetteBtn')?.classList.remove('active');
-            addToColorHistory(color);
-        }
-        
-        // Ajouter une couleur à l'historique
-        function addToColorHistory(color) {
-            // Ne pas ajouter si c'est déjà la dernière couleur
-            if (colorHistory[0] === color) return;
-            
-            // Retirer si déjà présent ailleurs
-            colorHistory = colorHistory.filter(c => c !== color);
-            
-            // Ajouter au début
-            colorHistory.unshift(color);
-            
-            // Limiter la taille
-            if (colorHistory.length > maxColorHistory) {
-                colorHistory.pop();
-            }
-            
-            // Mettre à jour l'affichage
-            updateColorHistoryDisplay();
-        }
-        
-        // Afficher l'historique des couleurs
-        function updateColorHistoryDisplay() {
-            const container = document.getElementById('colorHistory');
-            container.innerHTML = '';
-            
-            // Toujours afficher 5 slots
-            for (let i = 0; i < maxColorHistory; i++) {
-                const div = document.createElement('div');
-                div.className = 'history-color';
-                if (colorHistory[i]) {
-                    div.style.background = colorHistory[i];
-                    div.addEventListener('click', () => setColor(colorHistory[i]));
-                } else {
-                    div.style.background = 'transparent';
-                    div.style.border = '1px dashed #666';
-                }
-                container.appendChild(div);
-            }
-        }
-        
-        // Initialiser l'affichage de l'historique
-        updateColorHistoryDisplay();
-
-        // Toggle palette
-        document.getElementById('currentColor').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('colorPalette').classList.toggle('open');
-        });
-
-        // Fermer palette au clic ailleurs
-        document.addEventListener('click', () => {
-            document.getElementById('colorPalette').classList.remove('open');
-        });
-
-        document.getElementById('colorPalette').addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
-
-        // Désactiver l'anti-aliasing
-        ctx.imageSmoothingEnabled = false;
-
-        // Init canvas
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Sauvegarder l'état initial
-        saveState();
-
-        function saveState() {
-            history = history.slice(0, historyIndex + 1);
-            history.push(canvas.toDataURL());
-            if (history.length > maxHistory) {
-                history.shift();
-            } else {
-                historyIndex++;
-            }
-        }
-
-        function undo() {
-            if (historyIndex > 0) {
-                historyIndex--;
-                restoreState();
-            }
-        }
-
-        function redo() {
-            if (historyIndex < history.length - 1) {
-                historyIndex++;
-                restoreState();
-            }
-        }
-
-        function restoreState() {
-            const img = new Image();
-            img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-                updatePreview();
-            };
-            img.src = history[historyIndex];
-        }
-
-        // Flood fill
-        function floodFill(startX, startY, fillColor) {
-            startX = Math.floor(startX);
-            startY = Math.floor(startY);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-
-            const startPos = (startY * canvas.width + startX) * 4;
-            const startR = data[startPos];
-            const startG = data[startPos + 1];
-            const startB = data[startPos + 2];
-
-            const tempDiv = document.createElement('div');
-            tempDiv.style.color = fillColor;
-            document.body.appendChild(tempDiv);
-            const computedColor = getComputedStyle(tempDiv).color;
-            document.body.removeChild(tempDiv);
-            const rgbMatch = computedColor.match(/\d+/g);
-            const fillR = parseInt(rgbMatch[0]);
-            const fillG = parseInt(rgbMatch[1]);
-            const fillB = parseInt(rgbMatch[2]);
-
-            if (startR === fillR && startG === fillG && startB === fillB) return;
-
-            const stack = [[startX, startY]];
-            const visited = new Set();
-
-            while (stack.length > 0) {
-                const [x, y] = stack.pop();
-                const key = `${x},${y}`;
-
-                if (visited.has(key)) continue;
-                if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) continue;
-
-                const pos = (y * canvas.width + x) * 4;
-                if (data[pos] !== startR || data[pos + 1] !== startG || data[pos + 2] !== startB) continue;
-
-                visited.add(key);
-
-                data[pos] = fillR;
-                data[pos + 1] = fillG;
-                data[pos + 2] = fillB;
-                data[pos + 3] = 255;
-
-                stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-        }
-
-        function startDrawing(e) {
-            const [x, y] = getPos(e);
-
-            // Mode pipette
-            if (isPipetteMode) {
-                pickColor(x, y);
-                return;
-            }
-
-            if (isFillMode) {
-                floodFill(x, y, currentColor);
-                saveState();
-                updatePreview();
-                return;
-            }
-
-            isDrawing = true;
-            points = [{x, y}];
-            [lastX, lastY] = [x, y];
-            
-            // Sauvegarder l'état actuel du canvas
-            canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            // Effacer le canvas temporaire
-            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-            
-            // Dessiner un point au début (pour les clics simples)
-            const color = isEraser ? '#ffffff' : currentColor;
-            const size = (isEraser ? currentSize * 2 : currentSize) * SCALE;
-            tempCtx.fillStyle = color;
-            tempCtx.beginPath();
-            tempCtx.arc(x, y, size / 2, 0, Math.PI * 2);
-            tempCtx.fill();
-            
-            // Afficher
-            ctx.putImageData(canvasSnapshot, 0, 0);
-            ctx.globalAlpha = currentOpacity;
-            ctx.drawImage(tempCanvas, 0, 0);
-            ctx.globalAlpha = 1;
-        }
-        
-        // Pipette - récupérer la couleur d'un pixel
-        function pickColor(x, y) {
-            const pixel = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
-            const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
-            setColor(hex);
-            // Revenir au mode crayon
-            isPipetteMode = false;
-            document.getElementById('pipetteBtn').classList.remove('active');
-            document.getElementById('pencilBtn').classList.add('active');
-            showToast('Couleur récupérée !');
-        }
-
-        function draw(e) {
-            if (!isDrawing) return;
-            e.preventDefault();
-
-            const [x, y] = getPos(e);
-            points.push({x, y});
-
-            const color = isEraser ? '#ffffff' : currentColor;
-            const size = (isEraser ? currentSize * 2 : currentSize) * SCALE;
-
-            // Dessiner avec lissage sur le canvas temporaire
-            drawSmoothLine(tempCtx, points, color, size);
-            
-            // Restaurer le snapshot puis composer avec le trait temporaire
-            ctx.putImageData(canvasSnapshot, 0, 0);
-            ctx.globalAlpha = currentOpacity;
-            ctx.drawImage(tempCanvas, 0, 0);
-            ctx.globalAlpha = 1;
-
-            [lastX, lastY] = [x, y];
-        }
-        
-        // Dessin lissé avec courbes de Bézier quadratiques
-        function drawSmoothLine(context, pts, color, size) {
-            if (pts.length < 2) return;
-            
-            context.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-            context.strokeStyle = color;
-            context.lineWidth = size;
-            context.lineCap = 'round';
-            context.lineJoin = 'round';
-            
-            context.beginPath();
-            context.moveTo(pts[0].x, pts[0].y);
-            
-            if (pts.length === 2) {
-                // Juste 2 points : ligne droite
-                context.lineTo(pts[1].x, pts[1].y);
-            } else {
-                // Lissage avec courbes quadratiques
-                for (let i = 1; i < pts.length - 1; i++) {
-                    const midX = (pts[i].x + pts[i + 1].x) / 2;
-                    const midY = (pts[i].y + pts[i + 1].y) / 2;
-                    context.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
-                }
-                // Dernière ligne vers le dernier point
-                const last = pts[pts.length - 1];
-                const secondLast = pts[pts.length - 2];
-                context.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
-            }
-            
-            context.stroke();
-        }
-
-        function stopDrawing() {
-            if (isDrawing) {
-                isDrawing = false;
-                saveState();
-                updatePreview();
-            }
-        }
-
-        function getPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-
-            if (e.touches) {
-                return [
-                    (e.touches[0].clientX - rect.left) * scaleX,
-                    (e.touches[0].clientY - rect.top) * scaleY
-                ];
-            }
-            return [
-                (e.clientX - rect.left) * scaleX,
-                (e.clientY - rect.top) * scaleY
-            ];
-        }
-
-        // Event listeners canvas
-        canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseout', stopDrawing);
-        canvas.addEventListener('touchstart', startDrawing);
-        canvas.addEventListener('touchmove', draw);
-        canvas.addEventListener('touchend', stopDrawing);
-
-        // Size dots
-        document.querySelectorAll('.size-dot').forEach(dot => {
-            dot.addEventListener('click', () => {
-                document.querySelectorAll('.size-dot').forEach(d => d.classList.remove('active'));
-                dot.classList.add('active');
-                currentSize = parseInt(dot.dataset.size);
-            });
-        });
-
-        // Opacity dots
-        document.querySelectorAll('.opacity-dot').forEach(dot => {
-            dot.addEventListener('click', () => {
-                document.querySelectorAll('.opacity-dot').forEach(d => d.classList.remove('active'));
-                dot.classList.add('active');
-                currentOpacity = parseFloat(dot.dataset.opacity);
-            });
-        });
-
-        // Pencil button
-        document.getElementById('pencilBtn').addEventListener('click', () => selectTool('pencil'));
-
-        // Fill button
-        document.getElementById('fillBtn').addEventListener('click', () => selectTool('fill'));
-        
-        // Pipette button
-        document.getElementById('pipetteBtn').addEventListener('click', () => selectTool('pipette'));
-        
-        // Eraser button
-        document.getElementById('eraserBtn').addEventListener('click', () => selectTool('eraser'));
-        
-        // Fonction pour sélectionner un outil
-        function selectTool(tool) {
-            isFillMode = false;
-            isPipetteMode = false;
-            isEraser = false;
-            
-            document.getElementById('pencilBtn').classList.remove('active');
-            document.getElementById('fillBtn').classList.remove('active');
-            document.getElementById('pipetteBtn').classList.remove('active');
-            document.getElementById('eraserBtn').classList.remove('active');
-            
-            switch(tool) {
-                case 'pencil':
-                    document.getElementById('pencilBtn').classList.add('active');
-                    canvas.style.cursor = 'crosshair';
-                    break;
-                case 'fill':
-                    isFillMode = true;
-                    document.getElementById('fillBtn').classList.add('active');
-                    canvas.style.cursor = 'crosshair';
-                    break;
-                case 'pipette':
-                    isPipetteMode = true;
-                    document.getElementById('pipetteBtn').classList.add('active');
-                    canvas.style.cursor = 'crosshair';
-                    break;
-                case 'eraser':
-                    isEraser = true;
-                    document.getElementById('eraserBtn').classList.add('active');
-                    canvas.style.cursor = 'crosshair';
-                    break;
-            }
-        }
-        
-        // Sélectionner le crayon par défaut
-        selectTool('pencil');
-
-        // Undo / Redo
-        document.getElementById('undoBtn').addEventListener('click', undo);
-        document.getElementById('redoBtn').addEventListener('click', redo);
-
-        // Raccourcis clavier
-        document.addEventListener('keydown', (e) => {
-            // Ne pas intercepter si on est dans un input
-            if (e.target.tagName === 'INPUT') return;
-            
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z') {
-                    e.preventDefault();
-                    if (e.shiftKey) {
-                        redo();
-                    } else {
-                        undo();
-                    }
-                } else if (e.key === 'y') {
-                    e.preventDefault();
-                    redo();
-                } else if (e.key === 'v') {
-                    // Ctrl+V pour coller
-                    document.getElementById('pasteBtn').click();
-                }
-            } else {
-                // Raccourcis simples
-                switch(e.key.toLowerCase()) {
-                    case 'b':
-                        selectTool('pencil');
-                        break;
-                    case 'e':
-                        selectTool('eraser');
-                        break;
-                    case 'f':
-                        selectTool('fill');
-                        break;
-                    case 'g':
-                        selectTool('pipette');
-                        break;
-                    case '1':
-                        document.querySelectorAll('.size-dot')[0]?.click();
-                        break;
-                    case '2':
-                        document.querySelectorAll('.size-dot')[1]?.click();
-                        break;
-                    case '3':
-                        document.querySelectorAll('.size-dot')[2]?.click();
-                        break;
-                    case '4':
-                        document.querySelectorAll('.size-dot')[3]?.click();
-                        break;
-                }
-            }
-        });
-
-        // Clear
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            saveState();
-            updatePreview();
-        });
-
-        // Paste from clipboard
-        document.getElementById('pasteBtn').addEventListener('click', async () => {
-            try {
-                const clipboardItems = await navigator.clipboard.read();
-                for (const item of clipboardItems) {
-                    for (const type of item.types) {
-                        if (type.startsWith('image/')) {
-                            const blob = await item.getType(type);
-                            const img = new Image();
-                            img.onload = () => {
-                                const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-                                const w = img.width * scale;
-                                const h = img.height * scale;
-                                const x = (canvas.width - w) / 2;
-                                const y = (canvas.height - h) / 2;
-
-                                ctx.fillStyle = 'white';
-                                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                ctx.imageSmoothingEnabled = false;
-                                ctx.drawImage(img, x, y, w, h);
-                                saveState();
-                                updatePreview();
-                                showToast('Image collée ! 📋');
-                            };
-                            img.src = URL.createObjectURL(blob);
-                            return;
-                        }
-                    }
-                }
-                showToast('Pas d\'image dans le presse-papier');
-            } catch (err) {
-                showToast('Impossible de coller');
-            }
-        });
-
-        // Image input
-        const imageInput = document.getElementById('imageInput');
-        document.getElementById('imageBtn').addEventListener('click', () => {
-            imageInput.click();
-        });
-
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const img = new Image();
-                img.onload = () => {
-                    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-                    const w = img.width * scale;
-                    const h = img.height * scale;
-                    const x = (canvas.width - w) / 2;
-                    const y = (canvas.height - h) / 2;
-
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.imageSmoothingEnabled = false;
-                    ctx.drawImage(img, x, y, w, h);
-                    saveState();
-                    updatePreview();
-                };
-                img.src = URL.createObjectURL(file);
-            }
-            e.target.value = '';
-        });
-
-        // Fonction pour obtenir le canvas exporté en 200x200
-        function getExportCanvas() {
-            exportCtx.imageSmoothingEnabled = true;
-            exportCtx.imageSmoothingQuality = 'high';
-            exportCtx.drawImage(canvas, 0, 0, INTERNAL_SIZE, INTERNAL_SIZE, 0, 0, EXPORT_SIZE, EXPORT_SIZE);
-            return exportCanvas;
-        }
-
-        // Update preview
-        function updatePreview() {
-            const exported = getExportCanvas();
-            preview.src = exported.toDataURL('image/png');
-        }
-
-        // Download
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const exported = getExportCanvas();
-            const link = document.createElement('a');
-            link.download = 'doodle.png';
-            link.href = exported.toDataURL('image/png');
-            link.click();
-            showToast('Téléchargé ! 📥');
-        });
-
-        // Share (Web Share API pour mobile)
-        const shareBtn = document.getElementById('shareBtn');
-        
-        // Vérifier si le partage de fichiers est supporté
-        async function checkShareSupport() {
-            try {
-                if (navigator.canShare) {
-                    const testFile = new File(['test'], 'test.png', { type: 'image/png' });
-                    if (navigator.canShare({ files: [testFile] })) {
-                        shareBtn.style.display = 'block';
-                    }
-                }
-            } catch (e) {
-                // Partage non supporté
-            }
-        }
-        checkShareSupport();
-        
-        shareBtn.addEventListener('click', async () => {
-            try {
-                const exported = getExportCanvas();
-                const blob = await new Promise(resolve => exported.toBlob(resolve, 'image/png'));
-                const file = new File([blob], 'doodle.png', { type: 'image/png' });
-                
-                await navigator.share({
-                    files: [file],
-                    title: 'Doodle'
-                });
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    showToast('Partage annulé');
-                }
-            }
-        });
-
-        // Copy
-        document.getElementById('copyBtn').addEventListener('click', async () => {
-            try {
-                const exported = getExportCanvas();
-                const blob = await new Promise(resolve => exported.toBlob(resolve, 'image/png'));
-                await navigator.clipboard.write([
-                    new ClipboardItem({ 'image/png': blob })
-                ]);
-                showToast('Copié ! 📋');
-            } catch (err) {
-                showToast('Utilise le glisser-déposer 👇');
-            }
-        });
-
-        // Toast
-        function showToast(message) {
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-
-        // Detach button - ouvrir dans une popup
-        const detachBtn = document.getElementById('detachBtn');
-        
-        // Cacher le bouton si on est déjà dans une popup
-        if (window.opener || window.name === 'DoodleChatPopup') {
-            detachBtn.style.display = 'none';
-        }
-        
-        detachBtn.addEventListener('click', () => {
-            const width = 460;
-            const height = 750;
-            const left = window.screen.width - width - 20;
-            const top = 20;
-            
-            const popup = window.open(
-                window.location.href,
-                'DoodleChatPopup',
-                `width=${width},height=${height},left=${left},top=${top},popup=yes,resizable=yes`
-            );
-            
-            if (popup) {
-                showToast('Popup ouverte ! Tu peux fermer cet onglet.');
-            } else {
-                showToast('Popup bloquée — autorise les popups');
-            }
-        });
-
-        // PWA Installation
-        let deferredPrompt;
-        const installBtn = document.getElementById('installBtn');
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Empêcher Chrome d'afficher le prompt automatiquement
-            e.preventDefault();
-            // Sauvegarder l'événement pour l'utiliser plus tard
-            deferredPrompt = e;
-            // Afficher le bouton d'installation
-            installBtn.style.display = 'flex';
-        });
-
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) {
-                showToast('App déjà installée ou non disponible');
-                return;
-            }
-            
-            // Afficher le prompt d'installation
-            deferredPrompt.prompt();
-            
-            // Attendre la réponse de l'utilisateur
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                showToast('App installée ! 🎉');
-                installBtn.style.display = 'none';
-            }
-            
-            deferredPrompt = null;
-        });
-
-        // Cacher le bouton si l'app est déjà installée
-        window.addEventListener('appinstalled', () => {
-            installBtn.style.display = 'none';
-            deferredPrompt = null;
-        });
-
-        // Init - fond blanc
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        saveState();
-        updatePreview();
-    </script>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="films.js"></script>
+  <script type="text/babel" src="app.js"></script>
 </body>
 </html>

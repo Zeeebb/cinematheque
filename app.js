@@ -1,7 +1,20 @@
 const TMDB_KEY = '2dca580c2a14b55200e784d157207b4d';
-const TMDB_IMG = 'https://image.tmdb.org/t/p/w300';
+const TMDB_IMG_SM = 'https://image.tmdb.org/t/p/w154';
+const TMDB_IMG_LG = 'https://image.tmdb.org/t/p/w300';
 const OMDB_KEY = '2a89ad59';
 const SHEETS_API = 'https://script.google.com/macros/s/AKfycbwKSMuZksZwy6JLmBo9lq0kF9rwDkTP63_BY_a7czQHYiwuEJTWNUMJJiYZJCksNmjnUw/exec';
+
+// Helper to get small poster URL for grid
+const getSmallPoster = (url) => {
+  if (!url) return null;
+  return url.replace('/w300/', '/w154/').replace('/w500/', '/w154/');
+};
+
+// Helper to get large poster URL for modal
+const getLargePoster = (url) => {
+  if (!url) return null;
+  return url.replace('/w154/', '/w300/').replace('/w92/', '/w300/');
+};
 
 // Fetch poster from TMDB then fallback to OMDb
 const fetchPoster = async (title, year, type = 'movie') => {
@@ -12,7 +25,7 @@ const fetchPoster = async (title, year, type = 'movie') => {
     );
     const data = await res.json();
     if (data.results?.[0]?.poster_path) {
-      return TMDB_IMG + data.results[0].poster_path;
+      return TMDB_IMG_SM + data.results[0].poster_path;
     }
   } catch(e) {}
   
@@ -33,8 +46,14 @@ const fetchPoster = async (title, year, type = 'movie') => {
 
 const App = () => {
   const [tab, setTab] = React.useState('films');
-  const [films, setFilms] = React.useState([]);
-  const [series, setSeries] = React.useState([]);
+  const [films, setFilms] = React.useState(() => {
+    const cached = localStorage.getItem('cine_films_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [series, setSeries] = React.useState(() => {
+    const cached = localStorage.getItem('cine_series_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
   const [genre, setGenre] = React.useState('');
@@ -43,7 +62,7 @@ const App = () => {
   const [cardSize, setCardSize] = React.useState(120);
   const [showAdd, setShowAdd] = React.useState(false);
   const [showFix, setShowFix] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [syncing, setSyncing] = React.useState(false);
   const [lastSync, setLastSync] = React.useState(null);
 
@@ -54,8 +73,23 @@ const App = () => {
 
   // Load from Google Sheets on mount
   React.useEffect(() => {
+    const cached = localStorage.getItem('cine_films_cache');
+    if (!cached) setLoading(true);
     loadFromSheets();
   }, []);
+
+  // Save to cache whenever data changes
+  React.useEffect(() => {
+    if (films.length > 0) {
+      localStorage.setItem('cine_films_cache', JSON.stringify(films));
+    }
+  }, [films]);
+
+  React.useEffect(() => {
+    if (series.length > 0) {
+      localStorage.setItem('cine_series_cache', JSON.stringify(series));
+    }
+  }, [series]);
 
   // Fetch missing posters after loading
   const fetchMissingPosters = async (filmsList) => {
@@ -288,7 +322,7 @@ const App = () => {
                 <div key={f.id} className="card" onClick={() => setSelected(f)}>
                   {f.poster ? (
                     <>
-                      <img className="card-img" src={f.poster} alt={f.title} />
+                      <img className="card-img" src={getSmallPoster(f.poster)} alt={f.title} loading="lazy" />
                       <div className="card-info">
                         <div className="card-title">{f.title}</div>
                         <div className="card-year">{f.year}</div>
@@ -312,7 +346,7 @@ const App = () => {
               {filtered.map(f => (
                 <div key={f.id} className="list-item" onClick={() => setSelected(f)}>
                   {f.poster ? (
-                    <img className="list-poster" src={f.poster} alt="" />
+                    <img className="list-poster" src={getSmallPoster(f.poster)} alt="" loading="lazy" />
                   ) : (
                     <div className="list-poster-empty">{tab === 'films' ? '🎬' : '📺'}</div>
                   )}
@@ -346,7 +380,7 @@ const App = () => {
               <button className="modal-close" onClick={() => setSelected(null)}>×</button>
             </div>
             <div className="modal-body">
-              {selected.poster && <img className="modal-poster" src={selected.poster} alt="" />}
+              {selected.poster && <img className="modal-poster" src={getLargePoster(selected.poster)} alt="" />}
               <div className="modal-meta">
                 {selected.director || selected.creator} · {selected.year} {selected.country && `· ${selected.country}`}
               </div>
@@ -430,7 +464,7 @@ const FixPosterModal = ({ item, type, onClose, onSelect }) => {
           id: m.id,
           title: m.title || m.name,
           year: (m.release_date || m.first_air_date)?.split('-')[0],
-          poster: m.poster_path ? TMDB_IMG + m.poster_path : null,
+          poster: m.poster_path ? TMDB_IMG_SM + m.poster_path : null,
           source: 'TMDB'
         })) || []);
       } catch(e) {}
@@ -599,7 +633,7 @@ const AddModal = ({ type, onClose, onAdd }) => {
           country: details.production_countries?.[0]?.name || '',
           source: '',
           watched: false,
-          poster: item.poster_path ? TMDB_IMG + item.poster_path : ''
+          poster: item.poster_path ? TMDB_IMG_SM + item.poster_path : ''
         });
       } else {
         setForm({
@@ -612,7 +646,7 @@ const AddModal = ({ type, onClose, onAdd }) => {
           seasons: details.number_of_seasons || '',
           source: '',
           watched: false,
-          poster: item.poster_path ? TMDB_IMG + item.poster_path : ''
+          poster: item.poster_path ? TMDB_IMG_SM + item.poster_path : ''
         });
       }
       setMode('manual');
@@ -663,7 +697,7 @@ const AddModal = ({ type, onClose, onAdd }) => {
                   {results.map(m => (
                     <div key={m.id} className="search-result" onClick={() => selectItem(m)}>
                       {m.poster_path ? (
-                        <img src={TMDB_IMG + m.poster_path} alt="" />
+                        <img src={TMDB_IMG_SM + m.poster_path} alt="" />
                       ) : (
                         <div className="no-poster">{isFilm ? '🎬' : '📺'}</div>
                       )}

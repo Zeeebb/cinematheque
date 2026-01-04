@@ -227,6 +227,8 @@ const App = () => {
   };
 
   const [sort, setSort] = React.useState('year-desc');
+  const [showSeparators, setShowSeparators] = React.useState(true);
+  const [showEdit, setShowEdit] = React.useState(false);
 
   const genres = [...new Set(items.flatMap(f => f.genre ? f.genre.split(',').map(g => g.trim()) : []))].sort();
 
@@ -381,6 +383,18 @@ const App = () => {
     else saveAll(undefined, undefined, undefined, newItems);
   };
 
+  const updateItem = (id, updates) => {
+    const newItems = items.map(f => f.id === id ? {...f, ...updates} : f);
+    setItems(newItems);
+    if (selected?.id === id) setSelected({...selected, ...updates});
+    setShowEdit(false);
+    
+    if (tab === 'films') saveAll(newItems, undefined, undefined, undefined);
+    else if (tab === 'series') saveAll(undefined, newItems, undefined, undefined);
+    else if (tab === 'books') saveAll(undefined, undefined, newItems, undefined);
+    else saveAll(undefined, undefined, undefined, newItems);
+  };
+
   if (loading && films.length === 0) {
     return (
       <div className="loading-screen">
@@ -394,7 +408,7 @@ const App = () => {
     <div>
       <header className="header">
         <div className="header-top">
-          <div className="logo">Ciné<span>mathèque</span></div>
+          <div className="logo">ma <span>collection</span></div>
           <div className="header-right">
             <div className="stats">
               <b>{stats.total}</b> {tab} · <b>{stats.watched}</b> {tab === 'books' || tab === 'comics' ? (stats.watched > 1 ? 'lus' : 'lu') : (stats.watched > 1 ? 'vus' : 'vu')}
@@ -449,6 +463,11 @@ const App = () => {
           <div className="view-controls">
             <button className={`view-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>▦</button>
             <button className={`view-btn ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>☰</button>
+            <button 
+              className={`view-btn ${showSeparators ? 'active' : ''}`} 
+              onClick={() => setShowSeparators(!showSeparators)}
+              title="Séparateurs"
+            >―</button>
             {view === 'grid' && (
               <input type="range" className="size-slider" min="80" max="160" value={cardSize} onChange={e => setCardSize(Number(e.target.value))} />
             )}
@@ -460,63 +479,112 @@ const App = () => {
         <div className="count">{filtered.length} {tab}</div>
         {filtered.length > 0 ? (
           view === 'grid' ? (
-            <div className="grid-container">
-              {groupedItems.map((group, gi) => (
-                <React.Fragment key={gi}>
-                  {group.key && <div className="group-separator">{group.key}</div>}
-                  <div className="grid" style={{'--card-size': cardSize + 'px'}}>
-                    {group.items.map(f => (
-                      <div key={f.id} className="card" onClick={() => setSelected(f)}>
-                        {f.poster ? (
-                          <>
-                            <img className="card-img" src={getSmallPoster(f.poster)} alt={f.title} loading="lazy" />
-                            <div className="card-info">
+            <div className={showSeparators ? "grid-container" : ""}>
+              {showSeparators ? (
+                groupedItems.map((group, gi) => (
+                  <React.Fragment key={gi}>
+                    {group.key && <div className="group-separator">{group.key}</div>}
+                    <div className="grid" style={{'--card-size': cardSize + 'px'}}>
+                      {group.items.map(f => (
+                        <div key={f.id} className="card" onClick={() => setSelected(f)}>
+                          {f.poster ? (
+                            <>
+                              <img className="card-img" src={getSmallPoster(f.poster)} alt={f.title} loading="lazy" />
+                              <div className="card-info">
+                                <div className="card-title">{f.title}</div>
+                                <div className="card-year">{f.year}</div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="card-noimg">
                               <div className="card-title">{f.title}</div>
                               <div className="card-year">{f.year}</div>
                             </div>
-                          </>
-                        ) : (
-                          <div className="card-noimg">
+                          )}
+                          <div 
+                            className={`watch-btn ${f.watched ? 'watched' : ''}`} 
+                            onClick={e => toggleWatch(f.id, e)}
+                          >✓</div>
+                        </div>
+                      ))}
+                    </div>
+                  </React.Fragment>
+                ))
+              ) : (
+                <div className="grid" style={{'--card-size': cardSize + 'px'}}>
+                  {filtered.map(f => (
+                    <div key={f.id} className="card" onClick={() => setSelected(f)}>
+                      {f.poster ? (
+                        <>
+                          <img className="card-img" src={getSmallPoster(f.poster)} alt={f.title} loading="lazy" />
+                          <div className="card-info">
                             <div className="card-title">{f.title}</div>
                             <div className="card-year">{f.year}</div>
                           </div>
-                        )}
-                        <div 
-                          className={`watch-btn ${f.watched ? 'watched' : ''}`} 
-                          onClick={e => toggleWatch(f.id, e)}
-                        >✓</div>
-                      </div>
-                    ))}
-                  </div>
-                </React.Fragment>
-              ))}
+                        </>
+                      ) : (
+                        <div className="card-noimg">
+                          <div className="card-title">{f.title}</div>
+                          <div className="card-year">{f.year}</div>
+                        </div>
+                      )}
+                      <div 
+                        className={`watch-btn ${f.watched ? 'watched' : ''}`} 
+                        onClick={e => toggleWatch(f.id, e)}
+                      >✓</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
-            <div className="list-container">
-              {groupedItems.map((group, gi) => (
-                <React.Fragment key={gi}>
-                  {group.key && <div className="group-separator">{group.key}</div>}
-                  <div className="list">
-                    {group.items.map(f => (
-                      <div key={f.id} className="list-item" onClick={() => setSelected(f)}>
-                        {f.poster ? (
-                          <img className="list-poster" src={getSmallPoster(f.poster)} alt="" loading="lazy" />
-                        ) : (
-                          <div className="list-poster-empty">?</div>
-                        )}
-                        <div className="list-info">
-                          <div className="list-title">{f.title}</div>
-                          <div className="list-meta">{f.director || f.creator || f.author} · {f.year}</div>
+            <div className={showSeparators ? "list-container" : ""}>
+              {showSeparators ? (
+                groupedItems.map((group, gi) => (
+                  <React.Fragment key={gi}>
+                    {group.key && <div className="group-separator">{group.key}</div>}
+                    <div className="list">
+                      {group.items.map(f => (
+                        <div key={f.id} className="list-item" onClick={() => setSelected(f)}>
+                          {f.poster ? (
+                            <img className="list-poster" src={getSmallPoster(f.poster)} alt="" loading="lazy" />
+                          ) : (
+                            <div className="list-poster-empty">?</div>
+                          )}
+                          <div className="list-info">
+                            <div className="list-title">{f.title}</div>
+                            <div className="list-meta">{f.director || f.creator || f.author} · {f.year}</div>
+                          </div>
+                          <div 
+                            className={`watch-btn ${f.watched ? 'watched' : ''}`} 
+                            onClick={e => toggleWatch(f.id, e)}
+                          >✓</div>
                         </div>
-                        <div 
-                          className={`watch-btn ${f.watched ? 'watched' : ''}`} 
-                          onClick={e => toggleWatch(f.id, e)}
-                        >✓</div>
+                      ))}
+                    </div>
+                  </React.Fragment>
+                ))
+              ) : (
+                <div className="list">
+                  {filtered.map(f => (
+                    <div key={f.id} className="list-item" onClick={() => setSelected(f)}>
+                      {f.poster ? (
+                        <img className="list-poster" src={getSmallPoster(f.poster)} alt="" loading="lazy" />
+                      ) : (
+                        <div className="list-poster-empty">?</div>
+                      )}
+                      <div className="list-info">
+                        <div className="list-title">{f.title}</div>
+                        <div className="list-meta">{f.director || f.creator || f.author} · {f.year}</div>
                       </div>
-                    ))}
-                  </div>
-                </React.Fragment>
-              ))}
+                      <div 
+                        className={`watch-btn ${f.watched ? 'watched' : ''}`} 
+                        onClick={e => toggleWatch(f.id, e)}
+                      >✓</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         ) : (
@@ -541,6 +609,13 @@ const App = () => {
               <div className="modal-meta">
                 {selected.director || selected.creator || selected.author} · {selected.year} {selected.country && `· ${selected.country}`}
               </div>
+              {selected.rating > 0 && (
+                <div className="modal-rating">
+                  {[1,2,3,4,5].map(n => (
+                    <span key={n} className={`star ${selected.rating >= n ? '' : 'empty'}`}>★</span>
+                  ))}
+                </div>
+              )}
               {selected.seasons && (
                 <div className="modal-section">
                   <h4>Saisons</h4>
@@ -572,11 +647,14 @@ const App = () => {
                 >
                   {selected.watched ? (tab === 'books' || tab === 'comics' ? '✓ Lu' : '✓ Vu') : (tab === 'books' || tab === 'comics' ? 'Marquer lu' : 'Marquer vu')}
                 </button>
+                <button className="btn btn-secondary" onClick={() => setShowEdit(true)}>
+                  Modifier
+                </button>
                 <button className="btn btn-secondary" onClick={() => setShowFix(true)}>
-                  🖼️
+                  Affiche
                 </button>
                 <button className="btn btn-danger" onClick={() => { if(confirm('Supprimer ?')) deleteItem(selected.id); }}>
-                  🗑️
+                  ✕
                 </button>
               </div>
             </div>
@@ -593,12 +671,14 @@ const App = () => {
                 </>
               )}
             </div>
+            <Suggestions item={selected} type={tab} existingIds={items.map(i => i.title.toLowerCase())} onAdd={addItem} />
           </div>
         </div>
       )}
 
       {showAdd && <AddModal type={tab} onClose={() => setShowAdd(false)} onAdd={addItem} />}
       {showFix && selected && <FixPosterModal item={selected} type={tab} onClose={() => setShowFix(false)} onSelect={updatePoster} />}
+      {showEdit && selected && <EditModal item={selected} type={tab} onClose={() => setShowEdit(false)} onSave={updateItem} />}
     </div>
   );
 };
@@ -986,6 +1066,300 @@ const AddModal = ({ type, onClose, onAdd }) => {
               </div>
             </form>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Suggestions Component
+const Suggestions = ({ item, type, existingIds, onAdd }) => {
+  const [suggestions, setSuggestions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const isMedia = type === 'films' || type === 'series';
+
+  React.useEffect(() => {
+    const fetchSuggestions = async () => {
+      setLoading(true);
+      setSuggestions([]);
+      
+      try {
+        if (isMedia) {
+          // TMDB pour films/séries
+          const endpoint = type === 'films' ? 'search/movie' : 'search/tv';
+          const searchRes = await fetch(
+            `https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_KEY}&query=${encodeURIComponent(item.title)}&year=${item.year}`
+          );
+          const searchData = await searchRes.json();
+          
+          if (searchData.results?.[0]) {
+            const id = searchData.results[0].id;
+            const recEndpoint = type === 'films' ? `movie/${id}/recommendations` : `tv/${id}/recommendations`;
+            const recRes = await fetch(
+              `https://api.themoviedb.org/3/${recEndpoint}?api_key=${TMDB_KEY}&language=fr-FR`
+            );
+            const recData = await recRes.json();
+            
+            const filtered = (recData.results || [])
+              .filter(r => !existingIds.includes((r.title || r.name || '').toLowerCase()))
+              .slice(0, 6)
+              .map(r => ({
+                id: r.id,
+                title: r.title || r.name,
+                year: (r.release_date || r.first_air_date)?.split('-')[0],
+                poster: r.poster_path ? TMDB_IMG_SM + r.poster_path : null,
+                source: 'tmdb'
+              }));
+            
+            setSuggestions(filtered);
+          }
+        } else {
+          // Google Books pour livres/BD
+          const searchRes = await fetch(
+            `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(item.title + ' ' + (item.author || ''))}&maxResults=1`
+          );
+          const searchData = await searchRes.json();
+          
+          if (searchData.items?.[0]) {
+            const bookId = searchData.items[0].id;
+            
+            // Chercher des livres similaires par auteur ou catégorie
+            const author = item.author || searchData.items[0].volumeInfo?.authors?.[0] || '';
+            const category = searchData.items[0].volumeInfo?.categories?.[0] || '';
+            
+            let query = '';
+            if (author) query = `inauthor:${author}`;
+            else if (category) query = `subject:${category}`;
+            else query = item.title.split(' ')[0]; // Premier mot du titre
+            
+            const recRes = await fetch(
+              `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=12&langRestrict=fr`
+            );
+            const recData = await recRes.json();
+            
+            const filtered = (recData.items || [])
+              .filter(r => {
+                const title = r.volumeInfo?.title || '';
+                return title.toLowerCase() !== item.title.toLowerCase() && 
+                       !existingIds.includes(title.toLowerCase());
+              })
+              .slice(0, 6)
+              .map(r => ({
+                id: r.id,
+                title: r.volumeInfo?.title || '',
+                year: r.volumeInfo?.publishedDate?.split('-')[0] || '',
+                poster: r.volumeInfo?.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
+                author: r.volumeInfo?.authors?.[0] || '',
+                source: 'google'
+              }));
+            
+            setSuggestions(filtered);
+          }
+        }
+      } catch(e) {
+        console.error('Erreur suggestions:', e);
+      }
+      setLoading(false);
+    };
+
+    if (item?.title) {
+      fetchSuggestions();
+    }
+  }, [item?.id]);
+
+  const addSuggestion = async (sug) => {
+    try {
+      if (sug.source === 'tmdb') {
+        // Ajout film/série depuis TMDB
+        const endpoint = type === 'films' ? `movie/${sug.id}` : `tv/${sug.id}`;
+        const creditEndpoint = type === 'films' ? `movie/${sug.id}/credits` : `tv/${sug.id}/credits`;
+        
+        const [details, credits] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_KEY}&language=fr-FR`).then(r => r.json()),
+          fetch(`https://api.themoviedb.org/3/${creditEndpoint}?api_key=${TMDB_KEY}`).then(r => r.json())
+        ]);
+        
+        const newItem = {
+          id: Date.now(),
+          title: sug.title,
+          year: parseInt(sug.year) || 0,
+          poster: sug.poster,
+          genre: details.genres?.map(g => g.name).join(', ') || '',
+          watched: false
+        };
+        
+        if (type === 'films') {
+          newItem.director = credits.crew?.find(c => c.job === 'Director')?.name || '';
+          newItem.actors = credits.cast?.slice(0, 4).map(a => a.name).join(', ') || '';
+          newItem.country = details.production_countries?.[0]?.name || '';
+        } else {
+          newItem.creator = details.created_by?.[0]?.name || '';
+          newItem.actors = credits.cast?.slice(0, 4).map(a => a.name).join(', ') || '';
+          newItem.seasons = details.number_of_seasons || 0;
+        }
+        
+        onAdd(newItem);
+      } else {
+        // Ajout livre/BD depuis Google Books
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes/${sug.id}`);
+        const data = await res.json();
+        const info = data.volumeInfo || {};
+        
+        const newItem = {
+          id: Date.now(),
+          title: info.title || sug.title,
+          author: info.authors?.join(', ') || '',
+          year: parseInt(info.publishedDate?.split('-')[0]) || 0,
+          genre: info.categories?.join(', ') || '',
+          poster: info.imageLinks?.thumbnail?.replace('http:', 'https:') || sug.poster,
+          watched: false
+        };
+        
+        onAdd(newItem);
+      }
+      
+      setSuggestions(suggestions.filter(s => s.id !== sug.id));
+    } catch(e) {
+      console.error('Erreur ajout suggestion:', e);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="suggestions">
+        <div className="suggestions-title">Suggestions</div>
+        <div className="suggestions-loading">Chargement...</div>
+      </div>
+    );
+  }
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="suggestions">
+      <div className="suggestions-title">
+        {isMedia ? 'Si vous avez aimé, vous aimerez peut-être...' : `Du même auteur ou genre...`}
+      </div>
+      <div className="suggestions-grid">
+        {suggestions.map(sug => (
+          <div key={sug.id} className="suggestion-card" onClick={() => addSuggestion(sug)}>
+            {sug.poster ? (
+              <img src={sug.poster} alt={sug.title} />
+            ) : (
+              <div className="suggestion-noimg">?</div>
+            )}
+            <div className="suggestion-info">
+              <div className="suggestion-title">{sug.title}</div>
+              <div className="suggestion-year">{sug.author || sug.year}</div>
+            </div>
+            <div className="suggestion-add">+</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Edit Modal
+const EditModal = ({ item, type, onClose, onSave }) => {
+  const isFilm = type === 'films';
+  const isSeries = type === 'series';
+  const isMedia = isFilm || isSeries;
+  
+  const [form, setForm] = React.useState({
+    title: item.title || '',
+    director: item.director || '',
+    creator: item.creator || '',
+    author: item.author || '',
+    year: item.year || '',
+    genre: item.genre || '',
+    actors: item.actors || '',
+    country: item.country || '',
+    source: item.source || '',
+    seasons: item.seasons || '',
+    watched: item.watched || false,
+    rating: item.rating || 0
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.title) return;
+    onSave(item.id, {
+      ...form,
+      year: parseInt(form.year) || item.year,
+      seasons: form.seasons ? parseInt(form.seasons) : undefined,
+      rating: form.rating || undefined
+    });
+  };
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal add-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-title">Modifier</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <form onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <label className="full">
+                <span>Titre *</span>
+                <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+              </label>
+              <label>
+                <span>{isFilm ? 'Réalisateur' : isSeries ? 'Créateur' : 'Auteur'}</span>
+                <input type="text" value={isFilm ? form.director : isSeries ? form.creator : form.author} onChange={e => setForm({...form, [isFilm ? 'director' : isSeries ? 'creator' : 'author']: e.target.value})} />
+              </label>
+              <label>
+                <span>Année</span>
+                <input type="number" value={form.year} onChange={e => setForm({...form, year: e.target.value})} />
+              </label>
+              {isSeries && (
+                <label>
+                  <span>Saisons</span>
+                  <input type="number" value={form.seasons} onChange={e => setForm({...form, seasons: e.target.value})} />
+                </label>
+              )}
+              <label className={isSeries ? '' : 'full'}>
+                <span>Genre</span>
+                <input type="text" value={form.genre} onChange={e => setForm({...form, genre: e.target.value})} placeholder={isMedia ? 'Drame, Action...' : 'Roman, SF...'} />
+              </label>
+              {isMedia && (
+                <label className="full">
+                  <span>Casting</span>
+                  <input type="text" value={form.actors} onChange={e => setForm({...form, actors: e.target.value})} />
+                </label>
+              )}
+              <label className="full">
+                <span>Source / Reco</span>
+                <input type="text" value={form.source} onChange={e => setForm({...form, source: e.target.value})} placeholder="Reco ami..." />
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={form.watched} onChange={e => setForm({...form, watched: e.target.checked})} />
+                <span>{isMedia ? 'Vu' : 'Lu'}</span>
+              </label>
+              {form.watched && (
+                <label>
+                  <span>Note</span>
+                  <div className="rating-input">
+                    {[1,2,3,4,5].map(n => (
+                      <span 
+                        key={n} 
+                        className={`star ${form.rating >= n ? 'active' : ''}`}
+                        onClick={() => setForm({...form, rating: form.rating === n ? 0 : n})}
+                      >★</span>
+                    ))}
+                  </div>
+                </label>
+              )}
+            </div>
+            
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
+              <button type="submit" className="btn btn-primary">Enregistrer</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
